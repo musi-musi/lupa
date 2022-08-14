@@ -1,3 +1,21 @@
+const std = @import("std");
+
+fn format(buffer: []u8, comptime fmt: []const u8, args: anytype) []u8 {
+    if (std.fmt.bufPrint(buffer, fmt, args)) |buf| {
+        return buf;
+    }
+    else |_| {
+        const i = for (buffer) |c, i| {
+            if (c == 0) break i;
+        } else buffer.len;
+        const ellipsis_start = std.math.min(buffer.len - 3, i);
+        for (buffer[ellipsis_start..][0..3]) |*c| {
+            c.* = '.';
+        }
+        return buffer[0 .. ellipsis_start + 3];
+    }
+}
+
 //
 // WASM-4: https://wasm4.org/docs
 
@@ -118,6 +136,11 @@ pub extern fn diskw(src: [*]const u8, size: u32) u32;
 // │ Other Functions                                                           │
 // │                                                                           │
 // └───────────────────────────────────────────────────────────────────────────┘
+
+pub fn traceFormat(comptime maxlen: usize, comptime fmt: []const u8, args: anytype) void {
+    var buffer: [maxlen]u8 = undefined;
+    trace(format(&buffer, fmt, args));
+}
 
 /// Prints a message to the debug console.
 pub fn trace(x: []const u8) void {

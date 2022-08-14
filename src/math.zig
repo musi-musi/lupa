@@ -11,9 +11,11 @@ pub fn initNoise(seed: u64) void {
     }
 }
 
-pub fn noise(x: u16, y: u16) u8 {
+pub fn noise(x: i32, y: i32) u8 {
+    const xu = @bitCast(u32, x);
+    const yu = @bitCast(u32, y);
     var rng = std.rand.DefaultPrng.init(
-        @intCast(u64, x) << 16 | @intCast(u64, y)
+        @intCast(u64, xu) << 32 | @intCast(u64, yu)
     );
     return noise_table[rng.random().int(u8)];
 }
@@ -91,7 +93,7 @@ pub fn clamp(a: f32, min: f32, max: f32) f32 {
     return a;
 }
 
-fn grad(x: u16, y: u16) Vec {
+fn grad(x: i32, y: i32) Vec {
     const xn = @intToFloat(f32, noise(x +% 4, y -% 4));
     const yn = @intToFloat(f32, noise(x -% 4, y +% 4));
     return (Vec {
@@ -104,14 +106,14 @@ pub fn lerp(a: f32, b: f32, t: f32) f32 {
     return a + (b - a) * t;
 }
 
-fn dotGrad(v: Vec, xc: u16, yc: u16) f32 {
+fn dotGrad(v: Vec, xc: i32, yc: i32) f32 {
     return grad(xc, yc).dot(.{
         .x = v.x - @intToFloat(f32, xc),
         .y = v.y - @intToFloat(f32, yc),
     });
 }
 
-pub fn perlin(x: u16, y: u16, w: u16, h: u16) f32 {
+pub fn perlin(x: i32, y: i32, w: i32, h: i32) f32 {
     const xc = @divFloor(x, w);
     const yc = @divFloor(y, h);
     const wc = @intToFloat(f32, w);
