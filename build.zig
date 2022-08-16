@@ -12,7 +12,7 @@ pub fn build(b: *std.build.Builder) !void {
 
     var run = std.build.RunStep.create(b, "run emulator");
     run.addArg("w4");
-    run.addArg("run");
+    run.addArg("run-native");
     run.addArtifactArg(lib);
 
     const run_step = b.step("run", "run game in emulator");
@@ -21,7 +21,7 @@ pub fn build(b: *std.build.Builder) !void {
 }
 
 fn setup(lib: *std.build.LibExeObjStep) void {
-    lib.setTarget(.{ .cpu_arch = .wasm32, .os_tag = .freestanding });
+    lib.setTarget(.{ .cpu_arch = .wasm32, .os_tag = .wasi });
     lib.import_memory = true;
     lib.initial_memory = 65536;
     lib.max_memory = 65536;

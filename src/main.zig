@@ -1,7 +1,15 @@
 const std = @import("std");
 const w4 = @import("wasm4.zig");
 const m = @import("math.zig");
-const tl = @import("tile.zig");
+const lvl = @import("level.zig");
+const dr = @import("draw.zig");
+
+const Vf32 = m.Vf32;
+const Vi32 = m.Vi32;
+const Vu32 = m.Vu32;
+const vf32 = m.vf32;
+const vi32 = m.vi32;
+const vu32 = m.vu32;
 
 fn hc(comptime hex: []const u8) u32 {
     return comptime std.fmt.parseInt(u32, hex[1..], 16) catch {
@@ -83,8 +91,7 @@ const tile_sprites = [_][8]u8{
     },
 };
 
-
-var chunks: [tl.view_size][tl.view_size]tl.Chunk = undefined;
+var level = lvl.Level{};
 
 export fn start() void {
     w4.PALETTE.* = [4]u32 {
@@ -94,19 +101,18 @@ export fn start() void {
         hc("#372747"),
     };
     m.initNoise(0xBAAABEEE);
-    tl.view.update();
-    w4.traceFormat(64, "view size: {d} bytes", .{@sizeOf(tl.view.Chunks)});
+    level.init(player_pos);
+    // w4.traceFormat(64, "level size: {d}%", .{@intToFloat(f32, @sizeOf(lvl.Level)) * 400 / (1024 * 64)});
+    w4.traceFormat(64, "level size: {d} bytes", .{@sizeOf(lvl.Level)});
 }
 
 const w = w4.SCREEN_SIZE;
 const h = w4.SCREEN_SIZE;
 
-const cw = 16;
-const ch = 16;
+// var cam_pos: [2]i32 = .{0, 0};
 
-var cam_x: i32 = 0;
-var cam_y: i32 = 0;
-var thresh: f32 = 0;
+var player_pos: Vf32 = vf32(0, 0);
+const player_size: Vf32 = vf32(6, 6);
 
 export fn update() void {
     // if (w4.GAMEPAD1.* & w4.BUTTON_1 != 0)
@@ -114,48 +120,34 @@ export fn update() void {
     // if (w4.GAMEPAD1.* & w4.BUTTON_2 != 0)
     //     { thresh -= 0.01; }
     if (w4.GAMEPAD1.* & w4.BUTTON_LEFT != 0)
-        { cam_x -= 1; }
+        { player_pos.x -= 1; }
     if (w4.GAMEPAD1.* & w4.BUTTON_RIGHT != 0)
-        { cam_x += 1; }
+        { player_pos.x += 1; }
     if (w4.GAMEPAD1.* & w4.BUTTON_UP != 0)
-        { cam_y -= 1; }
+        { player_pos.y -= 1; }
     if (w4.GAMEPAD1.* & w4.BUTTON_DOWN != 0)
-        { cam_y += 1; }
-    tl.view.updatePosition(.{
-        .x = @intToFloat(f32, cam_x),
-        .y = @intToFloat(f32, cam_y),
-    });
-    tl.view.draw(
+        { player_pos.y += 1; }
+    dr.cam_pos = player_pos.cast(i32);
+    const cam_offset = dr.camOffset();
+    level.update(player_pos);
+    level.draw(
         &tile_sprites,
-        -(cam_x - w / 2),
-        -(cam_y - h / 2),
+        cam_offset,
     );
-    // var ci: u16 = 0;
-    // while (ci < tl.view_size) : (ci += 1) {
-    //     var cj: u16 = 0;
-    //     while (cj < tl.view_size) : (cj += 1) {
-    //         const cx = ci * tl.Chunk.size;
-    //         const cy = cj * tl.Chunk.size;
-    //         tl.drawChunkTiles(&chunks[ci][cj], 
-    //             cx * tl.Tile.size - cam_x,
-    //             cy * tl.Tile.size - cam_y,
-    //         );
-    //     }
-    // }
-    // var y: u16 = 0;
-    // while (y < h) : (y += 1) {
-    //     var b: u16 = 0;
-    //     while (b < w / 4) : (b += 1) {
-    //         var v: u8 = 0;
-    //         var i: u3 = 0;
-    //         while (i < 4) : (i += 1) {
-    //             const x = b * 4 + i;
-    //             const perlin = m.perlin(x -% cam_x, y -% cam_y, cw, ch) + thresh;
-    //             const c = m.lerp(-0.25, 1.25, (perlin + 1) / 2);
-    //             const color: u8 = @floatToInt(u8, m.clamp(c * 4, 0, 3));
-    //             v = v | color << (i * 2);
-    //         }
-    //         w4.FRAMEBUFFER[b + y * w/4] = v;
-    //     }
-    // }
+    // level.debugOverlay();
+    const player_bounds_pos = player_pos.sub(vf32(player_size.x / 2, player_size.y));
+    const player_sprite_pos = player_bounds_pos.cast(i32).add(cam_offset);
+    const player_sprite_size = player_size.cast(u32);
+    if (level.checkRect(player_bounds_pos, player_size, .{ .solid = .solid}, true)) {
+        w4.DRAW_COLORS.* = 0x44;
+    }
+    else {
+        w4.DRAW_COLORS.* = 0x33;
+    }
+    w4.rect(
+        player_sprite_pos.x,
+        player_sprite_pos.y,
+        player_sprite_size.x,
+        player_sprite_size.y,
+    );
 }
