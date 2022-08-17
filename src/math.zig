@@ -1,23 +1,39 @@
 const std = @import("std");
 
-pub fn castScalar(comptime B: type, a: anytype) B {
-    const A = @TypeOf(a);
-    const ai = @typeInfo(A);
-    const bi = @typeInfo(B);
-    switch (ai) {
-        .Int => switch (bi) {
-            .Int => return @intCast(B, a),
-            .Float => return @intToFloat(B, a),
+
+pub usingnamespace sclr;
+
+const sclr = struct {
+
+    pub fn cast(comptime B: type, a: anytype) B {
+        const A = @TypeOf(a);
+        const ai = @typeInfo(A);
+        const bi = @typeInfo(B);
+        switch (ai) {
+            .Int => switch (bi) {
+                .Int => return @intCast(B, a),
+                .Float => return @intToFloat(B, a),
+                else => @compileError("cannot cast " ++ @typeName(A) ++ " to " ++ @typeName(B)),
+            },
+            .Float => switch (bi) {
+                .Int => return @floatToInt(B, a),
+                .Float => return @floatCast(B, a),
+                else => @compileError("cannot cast " ++ @typeName(A) ++ " to " ++ @typeName(B)),
+            },
             else => @compileError("cannot cast " ++ @typeName(A) ++ " to " ++ @typeName(B)),
-        },
-        .Float => switch (bi) {
-            .Int => return @floatToInt(B, a),
-            .Float => return @floatCast(B, a),
-            else => @compileError("cannot cast " ++ @typeName(A) ++ " to " ++ @typeName(B)),
-        },
-        else => @compileError("cannot cast " ++ @typeName(A) ++ " to " ++ @typeName(B)),
+        }
     }
-}
+
+    pub fn divCeil(a: anytype, b: @TypeOf(a)) @TypeOf(a) {
+        if (@mod(a, b) == 0) {
+            return @divFloor(a, b);
+        }
+        else {
+            return @divFloor(a, b) + 1;
+        }
+    }
+
+};
 
 pub const Axis = enum(u1) {
     x = 0,
@@ -73,11 +89,15 @@ pub fn Vec(comptime T: type) type {
         }
 
         pub fn cast(v: V, comptime B: type) Vec(B) {
-            return Vec(B).init( castScalar(B, v.x), castScalar(B, v.y) );
+            return Vec(B).init( sclr.cast(B, v.x), sclr.cast(B, v.y) );
         }
 
         pub fn bitCast(v: V, comptime B: type) Vec(B) {
             return Vec(B).init( @bitCast(B, v.x), @bitCast(B, v.y) );
+        }
+
+        pub fn truncate(v: V, comptime B: type) Vec(B) {
+            return Vec(B).init( @truncate(B, v.x), @truncate(B, v.y) );
         }
 
         pub fn addScalar(a: V, b: T) V
@@ -111,6 +131,26 @@ pub fn Vec(comptime T: type) type {
         pub fn divFloor(a: V, b: V) V
             { return init( @divFloor(a.x, b.x), @divFloor(a.y, b.y)); }
 
+        pub fn divCeilScalar(a: V, b: T) V
+            { return a.divCeil(init(b, b)); }
+        pub fn divCeil(a: V, b: V) V
+            { return init( sclr.divCeil(a.x, b.x), sclr.divCeil(a.y, b.y)); }
+
+        pub fn modScalar(a: V, b: T) V
+            { return a.mod(init(b, b)); }
+        pub fn mod(a: V, b: V) V
+            { return init( @mod(a.x, b.x), @mod(a.y, b.y)); }
+
+        pub fn bitAndScalar(a: V, b: T) V
+            { return a.bitAnd(init(b, b)); }
+        pub fn bitAnd(a: V, b: V) V
+            { return init( a.x & b.x, a.y & b.y); }
+
+        pub fn bitOrScalar(a: V, b: T) V
+            { return a.bitOr(init(b, b)); }
+        pub fn bitOr(a: V, b: V) V
+            { return init( a.x | b.x, a.y | b.y); }
+
         pub fn neg(v: V) V
             { return init( -v.x, -v.y); }
         
@@ -138,6 +178,10 @@ pub fn Vec(comptime T: type) type {
 
         pub fn eql(a: V, b: V) bool {
             return a.x == b.x and a.y == b.y;
+        }
+
+        pub fn format(v: V, comptime fmt: []const u8, _: std.fmt.FormatOptions, writer: anytype) !void {
+            try writer.print("[{" ++ fmt ++ "}, {" ++ fmt ++ "}]", .{v.x, v.y});
         }
 
 

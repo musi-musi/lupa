@@ -101,7 +101,7 @@ export fn start() void {
         hc("#372747"),
     };
     m.initNoise(0xBAAABEEE);
-    level.init(player_pos);
+    level.init();
     // w4.traceFormat(64, "level size: {d}%", .{@intToFloat(f32, @sizeOf(lvl.Level)) * 400 / (1024 * 64)});
     w4.traceFormat(64, "level size: {d} bytes", .{@sizeOf(lvl.Level)});
 }
@@ -111,8 +111,10 @@ const h = w4.SCREEN_SIZE;
 
 // var cam_pos: [2]i32 = .{0, 0};
 
-var player_pos: Vf32 = vf32(0, 0);
-const player_size: Vf32 = vf32(6, 6);
+const move_speed: i32 = 4;
+
+var player_pos: Vi32 = vi32(0, 0);
+const player_size: Vu32 = vu32(24, 24);
 
 export fn update() void {
     // if (w4.GAMEPAD1.* & w4.BUTTON_1 != 0)
@@ -120,34 +122,35 @@ export fn update() void {
     // if (w4.GAMEPAD1.* & w4.BUTTON_2 != 0)
     //     { thresh -= 0.01; }
     if (w4.GAMEPAD1.* & w4.BUTTON_LEFT != 0)
-        { player_pos.x -= 1; }
+        { player_pos.x -= move_speed; }
     if (w4.GAMEPAD1.* & w4.BUTTON_RIGHT != 0)
-        { player_pos.x += 1; }
+        { player_pos.x += move_speed; }
     if (w4.GAMEPAD1.* & w4.BUTTON_UP != 0)
-        { player_pos.y -= 1; }
+        { player_pos.y -= move_speed; }
     if (w4.GAMEPAD1.* & w4.BUTTON_DOWN != 0)
-        { player_pos.y += 1; }
+        { player_pos.y += move_speed; }
     dr.cam_pos = player_pos.cast(i32);
     const cam_offset = dr.camOffset();
-    level.update(player_pos);
+    level.setViewCenterPosition(player_pos);
+    // w4.traceFormat(64, "c {d: >4} s {d: >4} e {d: >4}", .{level.center, level.start, level.end});
     level.draw(
-        &tile_sprites,
+        // &tile_sprites,
         cam_offset,
     );
     // level.debugOverlay();
-    const player_bounds_pos = player_pos.sub(vf32(player_size.x / 2, player_size.y));
-    const player_sprite_pos = player_bounds_pos.cast(i32).add(cam_offset);
-    const player_sprite_size = player_size.cast(u32);
-    if (level.checkRect(player_bounds_pos, player_size, .{ .solid = .solid}, true)) {
-        w4.DRAW_COLORS.* = 0x44;
-    }
-    else {
-        w4.DRAW_COLORS.* = 0x33;
-    }
-    w4.rect(
-        player_sprite_pos.x,
-        player_sprite_pos.y,
-        player_sprite_size.x,
-        player_sprite_size.y,
-    );
+    // const player_bounds_pos = player_pos.sub(player_size.div(vu32(2, 1)).cast(i32));
+    // const player_sprite_pos = player_bounds_pos.add(cam_offset);
+    // const player_sprite_size = player_size.cast(u32);
+    // if (level.checkRect(player_bounds_pos, player_size, .{ .solid = .solid}, true)) {
+    //     w4.DRAW_COLORS.* = 0x44;
+    // }
+    // else {
+    //     w4.DRAW_COLORS.* = 0x33;
+    // }
+    // w4.rect(
+    //     player_sprite_pos.x,
+    //     player_sprite_pos.y,
+    //     player_sprite_size.x,
+    //     player_sprite_size.y,
+    // );
 }
