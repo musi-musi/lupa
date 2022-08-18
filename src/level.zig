@@ -39,6 +39,7 @@ pub const Level = struct {
 
     pub fn init(self: *Self) void {
         _ = self;
+        self.generateRegion(self.view_pos, self.view_pos.addScalar(view_size));
     }
 
     pub fn tileIndex(tile_pos: Vi32) Vu32 {
@@ -64,14 +65,65 @@ pub const Level = struct {
     /// set upper left corner view position from a position in tiles
     pub fn setViewPosition(self: *Self, view_pos: Vi32) void {
         if (!view_pos.eql(self.view_pos)) {
-            const start = view_pos;
-            const end = start.addScalar(view_size);
-            self.updateRegion(start, end);
+            const s = self.view_pos;
+            const e = s.addScalar(view_size);
+            const ns = view_pos;
+            const ne = ns.addScalar(view_size);
+            if (ns.x < s.x) {
+                self.generateRegion(
+                    vi32(ns.x, ns.y),
+                    vi32( s.x, ne.y),
+                );
+                if (ns.y < s.y) {
+                    self.generateRegion(
+                        vi32( s.x, ns.y),
+                        vi32(ne.x,  s.y),
+                    );
+                }
+                else if (ns.y > s.y) {
+                    self.generateRegion(
+                        vi32( s.x,  e.y),
+                        vi32(ne.x, ne.y),
+                    );
+                }
+            }
+            else if (ns.x > s.x) {
+                self.generateRegion(
+                    vi32( e.x, ns.y),
+                    vi32(ne.x, ne.y),
+                );
+                if (ns.y < s.y) {
+                    self.generateRegion(
+                        vi32(ns.x, ns.y),
+                        vi32(ne.x,  s.y),
+                    );
+                }
+                else if (ns.y > s.y) {
+                    self.generateRegion(
+                        vi32(ns.x,  e.y),
+                        vi32(ne.x, ne.y),
+                    );
+                }
+            }
+            else {
+                if (ns.y < s.y) {
+                    self.generateRegion(
+                        vi32(ns.x, ns.y),
+                        vi32(ne.x,  s.y),
+                    );
+                }
+                else if (ns.y > s.y) {
+                    self.generateRegion(
+                        vi32(ns.x,  e.y),
+                        vi32(ne.x, ne.y),
+                    );
+                }
+            }
             self.view_pos = view_pos;
         }
     }
 
-    fn updateRegion(self: *Self, start: Vi32, end: Vi32) void {
+    fn generateRegion(self: *Self, start: Vi32, end: Vi32) void {
         var pos = start;
         while (pos.x < end.x) : (pos.x += 1) {
             pos.y = start.y;
@@ -79,6 +131,10 @@ pub const Level = struct {
                 self.getTilePtr(pos).* = tileAtPosition(pos);
             }
         }
+    }
+
+    fn generateTile(self: *Self,  tile_pos: Vi32) void {
+        self.getTilePtr(tile_pos).* = tileAtPosition(tile_pos);
     }
 
     fn tileAtPosition(tile_pos: Vi32) Tile {
@@ -92,18 +148,22 @@ pub const Level = struct {
   
     }
 
-    pub fn draw(self: Self, pixel_pos: Vi32) void {
-        var tile_pos = self.view_pos;
-        while (tile_pos.x < view_size) : (tile_pos.x += 1) {
-            tile_pos.y = self.view_pos.y;
-            while (tile_pos.y < view_size) : (tile_pos.y += 1) {
+    pub fn draw(self: Self, comptime sprites_len: usize, sprites: [sprites_len][8]u8, pixel_pos: Vi32) void {
+        const start = self.view_pos;
+        const end = start.addScalar(view_size);
+        var tile_pos = start;
+        while (tile_pos.x < end.x) : (tile_pos.x += 1) {
+            tile_pos.y = start.y;
+            while (tile_pos.y < end.y) : (tile_pos.y += 1) {
                 const tile = self.getTile(tile_pos);
-                switch (tile.is_solid) {
-                    0 => w4.DRAW_COLORS.* = 0x22,
-                    1 => w4.DRAW_COLORS.* = 0x33,
+                if (tile.is_solid == 1) {
+                    w4.DRAW_COLORS.* = 0x20;
+                    const dpos = pixel_pos.add(tile_pos.mulScalar(tile_pixel_size)).subScalar(2);
+                    const n = m.noise(tile_pos);
+                    const sprite = sprites[(n >> 1) % sprites_len];
+                    const flags = (n & 0x1) << 1;
+                    w4.blit(&sprite, dpos.x, dpos.y, 8, 8, flags);
                 }
-                const dpos = pixel_pos.add(tile_pos.mulScalar(tile_pixel_size));
-                w4.rect(dpos.x, dpos.y, tile_pixel_size, tile_pixel_size);
             }
         }
     }

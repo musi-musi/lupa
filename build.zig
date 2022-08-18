@@ -21,7 +21,7 @@ pub fn build(b: *std.build.Builder) !void {
 }
 
 fn setup(lib: *std.build.LibExeObjStep) void {
-    lib.setTarget(.{ .cpu_arch = .wasm32, .os_tag = .wasi });
+    lib.setTarget(.{ .cpu_arch = .wasm32, .os_tag = .freestanding });
     lib.import_memory = true;
     lib.initial_memory = 65536;
     lib.max_memory = 65536;

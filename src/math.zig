@@ -205,12 +205,17 @@ pub fn initNoise(seed: u64) void {
     }
 }
 
-pub fn noise(v: Vi32) u8 {
-    const seeds = v.bitCast(u32).cast(u64);
-    var rng = std.rand.DefaultPrng.init(
-        seeds.x << 32 | seeds.y
-    );
-    return noise_table[rng.random().int(u8)];
+pub fn noise(v: anytype) u8 {
+    const len = @sizeOf(@TypeOf(v));
+    const bytes = @ptrCast([*]const u8, &v);
+    var n: u8 = noise_table[0];
+    comptime var i: usize = 0;
+    inline while (i < len) : (i += 1) {
+        const b = bytes[i];
+        const ni = noise_table[i % 256];
+        n +%= noise_table[ni +% b];
+    }
+    return n;
 }
 
 fn grad(v: Vi32) Vf32 {

@@ -18,77 +18,22 @@ fn hc(comptime hex: []const u8) u32 {
 }
 
 
-const tile_sprites = [_][8]u8{
-    [8]u8{
-        0b00000000,
-        0b00110000,
-        0b01111100,
-        0b00111110,
-        0b01111100,
-        0b00111110,
-        0b00110100,
-        0b00000000,
-    },
-    [8]u8{
-        0b00000000,
-        0b00000100,
-        0b00111110,
-        0b01111100,
-        0b01111100,
-        0b00111110,
-        0b00110000,
-        0b00000000,
-    },
-    [8]u8{
-        0b00000000,
-        0b00011000,
-        0b00111100,
-        0b01111110,
-        0b01111100,
-        0b01111110,
-        0b00010100,
-        0b00000000,
-    },
-    [8]u8{
-        0b00000000,
-        0b00010000,
-        0b01111110,
-        0b01111110,
-        0b00111100,
-        0b01111110,
-        0b00010100,
-        0b00000000,
-    },
-    [8]u8{
-        0b00011100,
-        0b00111110,
-        0b11111110,
-        0b01111110,
-        0b11111111,
-        0b01111111,
-        0b01111100,
-        0b00101000,
-    },
-    [8]u8{
-        0b00000000,
-        0b00111100,
-        0b01111110,
-        0b01111111,
-        0b01111111,
-        0b11111110,
-        0b01111100,
-        0b00011000,
-    },
-    [8]u8{
-        0b01101000,
-        0b01111100,
-        0b11111110,
-        0b01111111,
-        0b11111110,
-        0b01111110,
-        0b00111100,
-        0b00101000,
-    },
+const sprites = struct {
+    // tile_grassy
+    const tile_grassy_width = 8;
+    const tile_grassy_height = 8;
+    const tile_grassy_count = 8;
+    const tile_grassy = [8][8]u8{
+        [_]u8{0x14,0x08,0x3e,0x7e,0x7c,0x3c,0x00,0x00},
+        [_]u8{0x00,0x2c,0x7c,0x7e,0x7e,0x3e,0x18,0x00},
+        [_]u8{0x28,0x24,0x3c,0x3c,0x7c,0x7c,0x38,0x00},
+        [_]u8{0x08,0x18,0x3c,0x7c,0x7e,0x3e,0x3c,0x00},
+        [_]u8{0x04,0x3e,0x7e,0x7f,0x7f,0x7f,0x3e,0x00},
+        [_]u8{0x14,0x3c,0x7e,0x7e,0x3c,0x7e,0x7e,0x38},
+        [_]u8{0x08,0x3c,0x7c,0xfe,0xfe,0x7e,0x3c,0x00},
+        [_]u8{0x04,0x3c,0x7e,0xfe,0xfe,0x7e,0x7c,0x38},
+    };
+
 };
 
 var level = lvl.Level{};
@@ -117,10 +62,6 @@ var player_pos: Vi32 = vi32(0, 0);
 const player_size: Vu32 = vu32(24, 24);
 
 export fn update() void {
-    // if (w4.GAMEPAD1.* & w4.BUTTON_1 != 0)
-    //     { thresh += 0.01; }
-    // if (w4.GAMEPAD1.* & w4.BUTTON_2 != 0)
-    //     { thresh -= 0.01; }
     if (w4.GAMEPAD1.* & w4.BUTTON_LEFT != 0)
         { player_pos.x -= move_speed; }
     if (w4.GAMEPAD1.* & w4.BUTTON_RIGHT != 0)
@@ -134,7 +75,8 @@ export fn update() void {
     level.setViewCenterPosition(player_pos);
     // w4.traceFormat(64, "c {d: >4} s {d: >4} e {d: >4}", .{level.center, level.start, level.end});
     level.draw(
-        // &tile_sprites,
+        sprites.tile_grassy_count,
+        sprites.tile_grassy,
         cam_offset,
     );
     // level.debugOverlay();
