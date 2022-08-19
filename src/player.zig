@@ -269,7 +269,7 @@ pub const Player = struct {
             if(self.is_sprite_flipped) 0x1
             else 0x0
         );
-        w4.DRAW_COLORS.* = 0x130;
+        w4.DRAW_COLORS.* = 0x240;
         if (self.is_grounded) {
             if (self.is_sneaking) {
                 sprites.sneak.draw(pos.add(cam_offset), @divFloor(self.anim_frame, sneak_frame_time), flags);

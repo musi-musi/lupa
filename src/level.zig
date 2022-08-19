@@ -164,11 +164,17 @@ pub const Level = struct {
         const end = start.addScalar(view_size);
         var tile_pos = start;
         while (tile_pos.x < end.x) : (tile_pos.x += 1) {
-            tile_pos.y = start.y;
-            while (tile_pos.y < end.y) : (tile_pos.y += 1) {
+            tile_pos.y = end.y - 1;
+            while (tile_pos.y >= start.y) : (tile_pos.y -= 1) {
                 const tile = self.getTile(tile_pos);
                 if (tile.is_solid == 1) {
-                    w4.DRAW_COLORS.* = 0x20;
+                    const upper_tile = self.getTile(tile_pos.sub(vi32(0, 1)));
+                    if (upper_tile.is_solid == 1) {
+                        w4.DRAW_COLORS.* = 0x30;
+                    }
+                    else {
+                        w4.DRAW_COLORS.* = 0x20;
+                    }
                     const dpos = pos.add(tile_pos.mulScalar(tile_pixel_size));
                     const n = m.noise(tile_pos);
                     sprite.draw(dpos, n >> 1, n & 0x1);

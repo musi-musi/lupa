@@ -39,8 +39,8 @@ export fn start() void {
     w4.PALETTE.* = [4]u32 {
         hc("#92dad0"),
         hc("#2fa343"),
+        hc("#473e1f"),
         hc("#130012"),
-        hc("#9dff00"),
     };
     m.initNoise(0xBAAABEEE);
     level.init();
