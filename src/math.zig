@@ -9,12 +9,12 @@ pub usingnamespace struct {
         const ai = @typeInfo(A);
         const bi = @typeInfo(B);
         switch (ai) {
-            .Int => switch (bi) {
+            .Int, .ComptimeInt => switch (bi) {
                 .Int => return @intCast(B, a),
                 .Float => return @intToFloat(B, a),
                 else => @compileError("cannot cast " ++ @typeName(A) ++ " to " ++ @typeName(B)),
             },
-            .Float => switch (bi) {
+            .Float, .ComptimeFloat => switch (bi) {
                 .Int => return @floatToInt(B, a),
                 .Float => return @floatCast(B, a),
                 else => @compileError("cannot cast " ++ @typeName(A) ++ " to " ++ @typeName(B)),
@@ -58,11 +58,39 @@ pub fn Vec(comptime T: type) type {
 
         const V = @This();
 
-        pub fn init(x: T, y: T) V {
+        pub fn init(x: anytype, y: anytype) V {
             return .{
-                .x = x,
-                .y = y,
+                .x = m.cast(T, x),
+                .y = m.cast(T, y),
             };
+        }
+
+        pub fn from(x: anytype) V {
+            const X = @TypeOf(x);
+            switch (@typeInfo(X)) {
+                .Int, .Float, .ComptimeInt, .ComptimeFloat => {
+                    const x_t = m.cast(T, x);
+                    return init(x_t, x_t);
+                },
+                .Pointer => |Pointer| {
+                    if (Pointer.size != .slice) {
+                        return from(x.*);
+                    }
+                    else {
+                        return init(x[0], x[1]);
+                    }
+                },
+                .Array => {
+                    return init(x[0], x[1]);
+                },
+                .Struct => |Struct| {
+                    return init(
+                        @field(x, Struct.fields[0].name),
+                        @field(x, Struct.fields[1].name),
+                    );
+                },
+                else => @compileError(@typeName(X) ++ " cannot be converted to " ++ @typeName(V)),
+            }
         }
 
         pub fn initArr(a: [2]T) V {
@@ -226,7 +254,11 @@ fn grad(v: Vi32) Vf32 {
     ).norm() orelse Vf32.zero;
 }
 
-pub fn lerp(a: f32, b: f32, t: f32) f32 {
+pub fn lerp(a: anytype, b: @TypeOf(a), t: f32) @TypeOf(a) {
+    return m.cast(@TypeOf(a), lerpf(m.cast(f32, a), m.cast(f32, b), t));
+}
+
+pub fn lerpf(a: f32, b: f32, t: f32) f32 {
     return a + (b - a) * t;
 }
 
@@ -234,9 +266,10 @@ fn dotGrad(v: Vf32, cell: Vi32) f32 {
     return grad(cell).dot(v.sub(cell.cast(f32)));
 }
 
-pub fn perlin(v: Vi32, cell_size: Vi32) f32 {
-    const cell = v.divFloor(cell_size);
-    const pos = v.cast(f32).addScalar(0.5).div(cell_size.cast(f32));
+pub fn perlin(v: Vf32, comptime cell_size: anytype) f32 {
+    const cs = Vi32.from(cell_size);
+    const cell = v.cast(i32).divFloor(cs);
+    const pos = v.addScalar(0.5).div(cs.cast(f32));
     const d00 = dotGrad(pos, cell.add(vi32(0, 0)));
     const d01 = dotGrad(pos, cell.add(vi32(0, 1)));
     const d10 = dotGrad(pos, cell.add(vi32(1, 0)));
