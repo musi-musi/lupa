@@ -1,5 +1,6 @@
 const std = @import("std");
 const m = @import("math.zig");
+const spr = @import("sprite.zig");
 const w4 = @import("wasm4.zig");
 
 const Vi32 = m.Vi32;
@@ -9,18 +10,28 @@ const vu32 = m.vu32;
 
 // size of a pixel in units (sub-pixels)
 pub const pixel_size: u8 = 1 << pixel_size_bits;
-pub const pixel_size_bits: u8 = 2;
+pub const pixel_size_bits: u8 = 3;
 
 
 // size of a tile in units
 pub const tile_size: u32 = 1 << tile_size_bits;
-pub const tile_size_bits: u8 = 4;
+pub const tile_size_bits: u8 = 5;
 
 pub const tile_pixel_size = tile_size / pixel_size;
 
 pub const Tile = packed struct {
     is_solid: u1 = 0,
     _pad: u7 = 0,
+
+};
+
+pub const TileFilter = fn (Tile) bool;
+
+pub const tile_filter = struct {
+
+    pub fn isSolid(tile: Tile) bool {
+        return tile.is_solid == 1;
+    }
 
 };
 
@@ -148,7 +159,7 @@ pub const Level = struct {
   
     }
 
-    pub fn draw(self: Self, comptime sprites_len: usize, sprites: [sprites_len][8]u8, pixel_pos: Vi32) void {
+    pub fn draw(self: Self, comptime sprite: spr.Sprite, pos: Vi32) void {
         const start = self.view_pos;
         const end = start.addScalar(view_size);
         var tile_pos = start;
@@ -158,14 +169,85 @@ pub const Level = struct {
                 const tile = self.getTile(tile_pos);
                 if (tile.is_solid == 1) {
                     w4.DRAW_COLORS.* = 0x20;
-                    const dpos = pixel_pos.add(tile_pos.mulScalar(tile_pixel_size)).subScalar(2);
+                    const dpos = pos.add(tile_pos.mulScalar(tile_pixel_size));
                     const n = m.noise(tile_pos);
-                    const sprite = sprites[(n >> 1) % sprites_len];
-                    const flags = (n & 0x1) << 1;
-                    w4.blit(&sprite, dpos.x, dpos.y, 8, 8, flags);
+                    sprite.draw(dpos, n >> 1, n & 0x1);
                 }
             }
         }
+    }
+
+    pub fn checkRect(self: Self, pos: Vi32, size: Vu32, comptime filter: TileFilter) bool {
+        const start = pos.divFloorScalar(tile_size);
+        const end = pos.add(size.cast(i32)).divCeilScalar(tile_size);
+        var tp = start;
+        while (tp.x < end.x) : (tp.x += 1) {
+            tp.y = start.y;
+            while (tp.y < end.y) : (tp.y += 1) {
+                if (filter(self.getTile(tp))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    pub fn rectMoveDelta(self: Self, pos: Vi32, size: Vu32, move: Vi32,  comptime filter: TileFilter) Vi32 {
+        var p = pos;
+        const dx = self.rectMoveDeltaAxis(p, size, .x, move.x, filter) orelse move.x;
+        p.x += dx;
+        const dy = self.rectMoveDeltaAxis(p, size, .y, move.y, filter) orelse move.y;
+        return vi32(dx, dy);
+    }
+
+    pub fn rectMoveDeltaAxis(self: Self, pos: Vi32, size: Vu32, comptime axis: m.Axis, dist: i32, comptime filter: TileFilter) ?i32 {
+        if (dist > 0) {
+            if (self.rectMoveDeltaAxisSigned(pos, size, axis, false, @intCast(u32, dist), filter)) |delta| {
+                return @intCast(i32, delta);
+            }
+            else {
+                return null;
+            }
+        }
+        else if (dist < 0) {
+            if (self.rectMoveDeltaAxisSigned(pos, size, axis, true, @intCast(u32, -dist), filter)) |delta| {
+                return -@intCast(i32, delta);
+            }
+            else {
+                return null;
+            }
+        }
+        else {
+            return 0;
+        }
+    }
+
+    fn rectMoveDeltaAxisSigned(self: Self, pos: Vi32, size: Vu32, comptime axis: m.Axis, comptime is_neg: bool, dist: u32, comptime filter: TileFilter) ?u32 {
+        var p = pos;
+        const x = p.ptr(axis);
+        var left: u32 = dist;
+        while (left > 0) {
+            const step: u8 = std.math.min(@intCast(u8, left), tile_size);
+            left -= step;
+            if (is_neg) {
+                x.* -= step;
+            }
+            else {
+                x.* += step;
+            }
+            if (self.checkRect(p, size, filter)) {
+                if (is_neg) {
+                    x.* = m.divCeil(x.*, tile_size) * tile_size;
+                    return @intCast(u32, pos.get(axis) - x.*);
+                }
+                else {
+                    const end = x.* + @intCast(i32, size.get(axis));
+                    x.* = @divFloor(end, tile_size) * tile_size - @intCast(i32, size.get(axis));
+                    return @intCast(u32, x.* - pos.get(axis));
+                }
+            }
+        }
+        return null;
     }
 
 };

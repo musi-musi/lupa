@@ -1,9 +1,8 @@
 const std = @import("std");
 
+const m = @This();
 
-pub usingnamespace sclr;
-
-const sclr = struct {
+pub usingnamespace struct {
 
     pub fn cast(comptime B: type, a: anytype) B {
         const A = @TypeOf(a);
@@ -89,7 +88,7 @@ pub fn Vec(comptime T: type) type {
         }
 
         pub fn cast(v: V, comptime B: type) Vec(B) {
-            return Vec(B).init( sclr.cast(B, v.x), sclr.cast(B, v.y) );
+            return Vec(B).init( m.cast(B, v.x), m.cast(B, v.y) );
         }
 
         pub fn bitCast(v: V, comptime B: type) Vec(B) {
@@ -134,7 +133,7 @@ pub fn Vec(comptime T: type) type {
         pub fn divCeilScalar(a: V, b: T) V
             { return a.divCeil(init(b, b)); }
         pub fn divCeil(a: V, b: V) V
-            { return init( sclr.divCeil(a.x, b.x), sclr.divCeil(a.y, b.y)); }
+            { return init( m.divCeil(a.x, b.x), m.divCeil(a.y, b.y)); }
 
         pub fn modScalar(a: V, b: T) V
             { return a.mod(init(b, b)); }

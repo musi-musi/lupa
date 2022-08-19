@@ -3,6 +3,9 @@ const w4 = @import("wasm4.zig");
 const m = @import("math.zig");
 const lvl = @import("level.zig");
 const dr = @import("draw.zig");
+const spr = @import("sprite.zig");
+const plr = @import("player.zig");
+const input = @import("input.zig");
 
 const Vf32 = m.Vf32;
 const Vi32 = m.Vi32;
@@ -19,19 +22,13 @@ fn hc(comptime hex: []const u8) u32 {
 
 
 const sprites = struct {
-    // tile_grassy
-    const tile_grassy_width = 8;
-    const tile_grassy_height = 8;
-    const tile_grassy_count = 8;
-    const tile_grassy = [8][8]u8{
-        [_]u8{0x14,0x08,0x3e,0x7e,0x7c,0x3c,0x00,0x00},
-        [_]u8{0x00,0x2c,0x7c,0x7e,0x7e,0x3e,0x18,0x00},
-        [_]u8{0x28,0x24,0x3c,0x3c,0x7c,0x7c,0x38,0x00},
-        [_]u8{0x08,0x18,0x3c,0x7c,0x7e,0x3e,0x3c,0x00},
-        [_]u8{0x04,0x3e,0x7e,0x7f,0x7f,0x7f,0x3e,0x00},
-        [_]u8{0x14,0x3c,0x7e,0x7e,0x3c,0x7e,0x7e,0x38},
-        [_]u8{0x08,0x3c,0x7c,0xfe,0xfe,0x7e,0x3c,0x00},
-        [_]u8{0x04,0x3c,0x7e,0xfe,0xfe,0x7e,0x7c,0x38},
+
+    const tile_grassy = spr.Sprite {
+        .width = 8,
+        .height = 8,
+        .origin = vu32(2, 2),
+        .frame_count = 8,
+        .data = &[64]u8{ 0x14,0x08,0x3e,0x7e,0x7c,0x3c,0x00,0x00,0x00,0x2c,0x7c,0x7e,0x7e,0x3e,0x18,0x00,0x28,0x24,0x3c,0x3c,0x7c,0x7c,0x38,0x00,0x08,0x18,0x3c,0x7c,0x7e,0x3e,0x3c,0x00,0x04,0x3e,0x7e,0x7f,0x7f,0x7f,0x3e,0x00,0x14,0x3c,0x7e,0x7e,0x3c,0x7e,0x7e,0x38,0x08,0x3c,0x7c,0xfe,0xfe,0x7e,0x3c,0x00,0x04,0x3c,0x7e,0xfe, 0xfe,0x7e,0x7c,0x38 },
     };
 
 };
@@ -42,8 +39,8 @@ export fn start() void {
     w4.PALETTE.* = [4]u32 {
         hc("#92dad0"),
         hc("#2fa343"),
-        hc("#356438"),
-        hc("#372747"),
+        hc("#130012"),
+        hc("#9dff00"),
     };
     m.initNoise(0xBAAABEEE);
     level.init();
@@ -58,41 +55,17 @@ const h = w4.SCREEN_SIZE;
 
 const move_speed: i32 = 4;
 
-var player_pos: Vi32 = vi32(0, 0);
-const player_size: Vu32 = vu32(24, 24);
+var player = plr.Player{};
 
 export fn update() void {
-    if (w4.GAMEPAD1.* & w4.BUTTON_LEFT != 0)
-        { player_pos.x -= move_speed; }
-    if (w4.GAMEPAD1.* & w4.BUTTON_RIGHT != 0)
-        { player_pos.x += move_speed; }
-    if (w4.GAMEPAD1.* & w4.BUTTON_UP != 0)
-        { player_pos.y -= move_speed; }
-    if (w4.GAMEPAD1.* & w4.BUTTON_DOWN != 0)
-        { player_pos.y += move_speed; }
-    dr.cam_pos = player_pos.cast(i32);
+    player.update(level);
+    dr.cam_pos = player.drawPosition();
     const cam_offset = dr.camOffset();
-    level.setViewCenterPosition(player_pos);
-    // w4.traceFormat(64, "c {d: >4} s {d: >4} e {d: >4}", .{level.center, level.start, level.end});
+    level.setViewCenterPosition(player.pos);
+    player.draw(cam_offset);
     level.draw(
-        sprites.tile_grassy_count,
         sprites.tile_grassy,
         cam_offset,
     );
-    // level.debugOverlay();
-    // const player_bounds_pos = player_pos.sub(player_size.div(vu32(2, 1)).cast(i32));
-    // const player_sprite_pos = player_bounds_pos.add(cam_offset);
-    // const player_sprite_size = player_size.cast(u32);
-    // if (level.checkRect(player_bounds_pos, player_size, .{ .solid = .solid}, true)) {
-    //     w4.DRAW_COLORS.* = 0x44;
-    // }
-    // else {
-    //     w4.DRAW_COLORS.* = 0x33;
-    // }
-    // w4.rect(
-    //     player_sprite_pos.x,
-    //     player_sprite_pos.y,
-    //     player_sprite_size.x,
-    //     player_sprite_size.y,
-    // );
+    input.update();
 }
