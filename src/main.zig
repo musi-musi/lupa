@@ -46,9 +46,9 @@ var level: lvl.Level = .{};
 
 export fn start() void {
     w4.PALETTE.* = [4]u32 {
-        hc("#6dffec"),
-        hc("#2fa343"),
-        hc("#473e1f"),
+        hc("#fffdee"),
+        hc("#8b9b8f"),
+        hc("#484c52"),
         hc("#130012"),
     };
     m.initNoise(0x52064382);
@@ -67,14 +67,17 @@ const move_speed: i32 = 4;
 var player = plr.Player{};
 
 export fn update() void {
+    // std.mem.set(u8, w4.FRAMEBUFFER, 0xFF);
+    // w4.DRAW_COLORS.* = 0x11;
+    // w4.oval(12, 12, 160 - 24, 160 - 24);
+    // w4.DRAW_COLORS.* = 0x44;
+    // w4.oval(24, 24, 160 - 48, 160 - 48);
     player.update(level);
     dr.cam_pos = player.drawPosition();
     const cam_offset = dr.camOffset();
     level.setViewCenterPosition(player.pos);
     player.draw(cam_offset);
-    level.draw(
-        sprites.tile_grassy,
-        cam_offset,
-    );
+    level.draw(cam_offset);
     input.update();
+
 }
