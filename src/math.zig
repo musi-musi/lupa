@@ -222,13 +222,49 @@ pub fn clamp(a: f32, min: f32, max: f32) f32 {
     return a;
 }
 
+pub const LcgConfig = struct {
+    mod: u64 = (1 << 32) - 1,
+    mul: u64 = 6364136223846793005,
+    // mul: u64 = @bitCast(u64, "meowmeow"),
+    inc: u64 = 1442695040888963407,
+    // inc: u64 = @bitCast(u64, "purrpurr"),
+};
+
+pub fn Lcg(comptime config: LcgConfig) type {
+    return struct {
+        state: u64,
+
+        const Self = @This();
+
+        pub fn init(seed: u64) Self {
+            return Self {
+                .state = seed,
+            };
+        }
+
+        pub fn next(self: *Self) u64 {
+            self.state = (config.mul *% self.state +% config.inc) % config.mod;
+            return self.state;
+        }
+
+        pub fn int(self: *Self, comptime T: type) T {
+            const Bits = std.meta.Int(.unsigned, @bitSizeOf(T));
+            return @bitCast(T, @truncate(Bits, self.next()));
+        }
+
+        pub fn float(self: *Self, comptime T: type) T {
+            return @intToFloat(T, self.next()) / @intToFloat(T, ~@as(u64, 0));
+        }
+
+    };
+}
+
 var noise_table: [256]u8 = undefined;
 
 pub fn initNoise(seed: u64) void {
-    var rng = std.rand.DefaultPrng.init(seed);
-    const r = rng.random();
+    var lcg = Lcg(.{}).init(seed);
     for (noise_table) |*x| {
-        x.* = r.int(u8);
+        x.* = lcg.int(u8);
     }
 }
 
@@ -245,12 +281,25 @@ pub fn noise(v: anytype) u8 {
     return n;
 }
 
+pub fn noisef(v: anytype) f32 {
+    return @intToFloat(f32, noise(v)) / 255;
+}
+
+pub fn valueNoise(v: f32, cell_size: anytype) f32 {
+    const cs = m.cast(i32, cell_size);
+    const i = @divFloor(@floatToInt(i32, v), cs);
+    return lerp(
+        (noisef(i) * 2) - 1,
+        (noisef(i + 1) * 2) - 1,
+        @mod(v, @intToFloat(f32, cs)) / @intToFloat(f32, cs)
+    );
+
+}
+
 fn grad(v: Vi32) Vf32 {
-    const xn = @intToFloat(f32, noise((v.add(vi32(-0xA6B9, 0x88DF)))));
-    const yn = @intToFloat(f32, noise((v.add(vi32(0xE8F6, -0xC8D4)))));
     return vf32(
-        (xn - 128) / 128,
-        (yn - 128) / 128,
+        (noisef(v.add(vi32(-0xA6B9, 0x88DF))) * 2) - 1,
+        (noisef(v.add(vi32(0xE8F6, -0xC8D4))) * 2) - 1,
     ).norm() orelse Vf32.zero;
 }
 

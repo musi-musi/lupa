@@ -21,27 +21,6 @@ fn hc(comptime hex: []const u8) u32 {
 }
 
 
-const sprites = struct {
-
-    const tile_grassy = spr.Sprite {
-        .width = 8,
-        .height = 8,
-        .origin = vu32(2, 2),
-        .frame_count = 8,
-        .data = &[64]u8{
-            0x14,0x08,0x3e,0x7e,0x7c,0x3c,0x00,0x00,
-            0x00,0x2c,0x7c,0x7e,0x7e,0x3e,0x18,0x00,
-            0x28,0x24,0x3c,0x3c,0x7c,0x7c,0x38,0x00,
-            0x08,0x18,0x3c,0x7c,0x7e,0x3e,0x3c,0x00,
-            0x04,0x3e,0x7e,0x7f,0x7f,0x7f,0x3e,0x00,
-            0x14,0x3c,0x7e,0x7e,0x3c,0x7e,0x7e,0x38,
-            0x08,0x3c,0x7c,0xfe,0xfe,0x7e,0x3c,0x00,
-            0x04,0x3c,0x7e,0xfe,0xfe,0x7e,0x7c,0x38,
-        },
-    };
-
-};
-
 var level: lvl.Level = .{};
 
 export fn start() void {
@@ -52,13 +31,18 @@ export fn start() void {
         hc("#130012"),
     };
     m.initNoise(0x52064382);
-    level.init();
-    // w4.traceFormat(64, "level size: {d}%", .{@intToFloat(f32, @sizeOf(lvl.Level)) * 400 / (1024 * 64)});
     w4.traceFormat(64, "level size: {d} bytes", .{@sizeOf(lvl.Level)});
+    player.pos.x = @floatToInt(i32, lvl.pathX(0)) * lvl.tile_size;
+    level.initViewCenterPosition(player.pos);
+    w4.SYSTEM_FLAGS.* = w4.SYSTEM_PRESERVE_FRAMEBUFFER;
+    std.mem.set(u8, w4.FRAMEBUFFER, 0x00);
 }
+
+
 
 const w = w4.SCREEN_SIZE;
 const h = w4.SCREEN_SIZE;
+
 
 // var cam_pos: [2]i32 = .{0, 0};
 
@@ -66,12 +50,46 @@ const move_speed: i32 = 4;
 
 var player = plr.Player{};
 
+var y: i32 = 0;
+
+const map_size_bits: u8 = 3;
+const map_size: i32 = 1 << map_size_bits;
+
+var path_detail: u32 = 1;
+
 export fn update() void {
-    // std.mem.set(u8, w4.FRAMEBUFFER, 0xFF);
-    // w4.DRAW_COLORS.* = 0x11;
-    // w4.oval(12, 12, 160 - 24, 160 - 24);
-    // w4.DRAW_COLORS.* = 0x44;
-    // w4.oval(24, 24, 160 - 48, 160 - 48);
+    // defer input.update();
+    // if (path_detail > 1 and input.isHeld(0, .left)) {
+    //     path_detail -= 1;
+    //     w4.traceFormat(32, "{d}", .{path_detail});
+    // }
+    // if (input.isHeld(0, .right)) {
+    //     path_detail += 1;
+    //     w4.traceFormat(32, "{d}", .{path_detail});
+    // }
+    // var y: u32 = 0;
+    // while (y < w4.SCREEN_SIZE) : (y += 1) {
+    //     const row = w4.FRAMEBUFFER[y*w4.SCREEN_SIZE/4..][0..w4.SCREEN_SIZE/4];
+    //     const x = @floatToInt(u32, (pathNoise(y, path_detail) + 1) / 2 * @intToFloat(f32, (w4.SCREEN_SIZE)));
+    //     // const x = @floatToInt(u32, (m.perlin(vi32(0, y).cast(f32), 16) + 1) / 2 * @intToFloat(f32, (w4.SCREEN_SIZE)));
+    //     row[@divFloor(x, 4)] = @as(u8, 0b11) << @truncate(u3, (x % 4) * 2);
+    // }
+
+    // for (w4.FRAMEBUFFER) |*b, i| {
+    //     b.* = m.noise(i);
+    // }
+
+    // if (y < w4.SCREEN_SIZE) {
+    //     var x: i32 = 0;
+    //     while (x < w4.SCREEN_SIZE) : (x += 1) {
+    //         const p = vi32(x, y).cast(u32);
+    //         const map_start = vi32(x - 80, y).mulScalar(map_size);
+    //         w4.FRAMEBUFFER[p.y * w4.SCREEN_SIZE / 4 + p.x / 4] |= solidCount(map_start) << @intCast(u3, ((p.x % 4) * 2));
+    //     }
+    //     y += 1;
+    // }
+
+    std.mem.set(u8, w4.FRAMEBUFFER, 0x00);
     player.update(level);
     dr.cam_pos = player.drawPosition();
     const cam_offset = dr.camOffset();
@@ -80,4 +98,22 @@ export fn update() void {
     level.draw(cam_offset);
     input.update();
 
+}
+
+fn solidCount(ms: Vi32) u8 {
+    const me = ms.addScalar(map_size);
+    var pos = ms;
+    var count: i32 = 0;
+    while (pos.x < me.x) : (pos.x += 1) {
+        pos.y = ms.y;
+        while (pos.y < me.y) : (pos.y += 1) {
+            const shape = lvl.Level.genShape(pos);
+            if (shape < 0) {
+                count += 1;
+            }
+        }
+    }
+    return @intCast(u8, 
+        @divFloor(count, (1 << (map_size_bits * 2) - 2) + 1)
+    );
 }

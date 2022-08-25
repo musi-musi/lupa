@@ -17,21 +17,70 @@ pub const Biome = struct {
     fg_color1: u32,
     fg_color2: u32,
 
-    genShape: fn(Vi32) f32 = undefined,
-    pickTile: fn(Vi32, f32) Tile = undefined,
-    drawTile: fn(Tile, Vi32, u8) void = undefined,
+    gen_shape: fn(Vi32) f32 = undefined,
+    pick_tile: fn(Vi32, f32) Tile = undefined,
+    draw_tile: fn(Tile, Vi32, u8) void = undefined,
 
     const Self = @This();
 
     fn init(self: Self, comptime Ctx: type) Self {
         var s = self;
-        s.genShape = Ctx.genShape;
-        s.pickTile = Ctx.pickTile;
-        s.drawTile = Ctx.drawTile;
+        s.gen_shape = Ctx.genShape;
+        s.pick_tile = Ctx.pickTile;
+        s.draw_tile = Ctx.drawTile;
         return s;
     }
 
+    fn genShape(self: Self, tpos: Vi32) f32 {
+        // const shape = self.gen_shape(tpos);
+        _ = self;
+        const path = pathSdf(tpos);
+        return 16 - path;
+        // return shape * 32 - (path) + 40;
+    }
+
+    fn pickTile(self: Self, tpos: Vi32, shape: f32) Tile {
+        return self.pick_tile(tpos, shape);
+    }
+
+    fn drawTile(self: Self, tile: Tile, tpos: Vi32, noise: u8) void {
+        self.draw_tile(tile, tpos, noise);
+    }
+
 };
+
+
+fn pathSdf(tpos: Vi32) f32 {
+    const delta: i32 = 2;
+    const pos = tpos.cast(f32);
+    const center_a = vf32(pathX(tpos.y - delta), tpos.y - delta);
+    const center_b = vf32(pathX(tpos.y + delta), tpos.y + delta);
+    return std.math.min(
+        center_a.sub(pos).len(),
+        center_b.sub(pos).len(),
+    );
+}
+//     const path_x = pathX(tpos.y);
+//     // const dy: f32 = 1;
+//     // const dx = pathX(tpos.y + @floatToInt(i32, dy)) - path_x;
+//     // const theta = std.math.atan2(f32, dx, dy);
+//     const h = std.math.absFloat(@intToFloat(f32, tpos.x) - path_x);
+//     // return h * std.math.cos(theta);
+//     return h;
+// }
+
+pub fn pathX(y: i32) f32 {
+    return pathNoise(y, 8) * 1024;
+}
+
+fn pathNoise(y: i32, detail: u32) f32 {
+    var n: f32 = 0;
+    var d: i32 = 0;
+    while (d < detail) : (d += 1) {
+        n += m.valueNoise(@intToFloat(f32, y +% d * 2341), 256);
+    }
+    return n / std.math.pow(f32, @intToFloat(f32, detail), 0.55);
+}
 
 pub const tile_sprites = struct {
 
@@ -102,7 +151,7 @@ pub const surface = (Biome {
     fn genShape(tile_pos: Vi32) f32 {
         const p1 = m.perlin(tile_pos.cast(f32), .{32, 16});
         const p2 = m.perlin(tile_pos.add(vi32(0xA7, 0x7C)).cast(f32), .{8, 8});
-        return (p1 + p2 / 2) - 0.1;
+        return (p1 + p2 / 2);
     }
 
     fn pickTile(tile_pos: Vi32, _: f32) Tile {
@@ -136,23 +185,19 @@ pub const surface = (Biome {
 
 });
 
-pub const underground = Biome {
+pub const underground = (Biome {
     .bg_color = hc("#484d58"),
     .fg_color1 = hc("#3f3a30"),
     .fg_color2 = hc("#3f3a30"),
-};
+}).init(cavern_fns);
 
-pub const desert = Biome {
-    .bg_color = hc("#837602"),
-    .fg_color1 = hc("#da8b16"),
-    .fg_color2 = hc("#ffd13b"),
-};
+pub const desert = (Biome {
+    .bg_color = hc("#ffd13b"),
+    .fg_color1 = hc("#837602"),
+    .fg_color2 = hc("#da8b16"),
+}).init(cavern_fns);
 
-pub const cavern = (Biome {
-    .bg_color = hc("#5f2291"),
-    .fg_color1 = hc("#321557"),
-    .fg_color2 = hc("#3d2e92"),
-}).init(struct {
+const cavern_fns = struct {
 
     fn genShape(tile_pos: Vi32) f32 {
         const p1 = m.perlin(tile_pos.cast(f32), .{64, 32});
@@ -190,20 +235,26 @@ pub const cavern = (Biome {
 
     }
 
-});
+};
 
-pub const hell = Biome {
+pub const cavern = (Biome {
+    .bg_color = hc("#5f2291"),
+    .fg_color1 = hc("#321557"),
+    .fg_color2 = hc("#3d2e92"),
+}).init(cavern_fns);
+
+pub const hell = (Biome {
     .bg_color = hc("#4d111e"),
     .fg_color1 = hc("#a74d19"),
     .fg_color2 = hc("#e02f2f"),
-};
+}).init(cavern_fns);
 
 
-pub const layers = [_]Biome {
+pub const biomes = [_]Biome {
     surface,
     // underground,
+    // cavern,
     // desert,
-    cavern,
     // hell,
 };
 
@@ -217,23 +268,12 @@ pub const tile_filter = struct {
 
 };
 
-pub const TransitionPhase = enum(i32) {
-    full,
-    full_2color,
-    next_bg,
-    next_fg,
-    next,
-};
 
-pub const phases = std.enums.values(TransitionPhase);
-
-pub const phase_height: i32 = 64;
-pub const transition_height: i32 = 1024;
-// pub const transition_height: i32 = phase_height * phases.len;
+pub const transition_height: i32 = 16;
 
 
-pub const layer_height = 64;
-pub const layer_transition_height = transition_height + layer_height;
+pub const biome_height = 32;
+pub const biome_transition_height = transition_height + biome_height;
 
 pub const Level = struct {
     
@@ -248,6 +288,10 @@ pub const Level = struct {
 
     const Self = @This();
 
+    pub fn initViewCenterPosition(self: *Self, center_position: Vi32) void {
+        self.view_pos = center_position.divFloorScalar(tile_size).subScalar(view_size / 2);
+        self.init();
+    }
     pub fn init(self: *Self) void {
         _ = self;
         self.generateRegion(self.view_pos, self.view_pos.addScalar(view_size));
@@ -344,14 +388,10 @@ pub const Level = struct {
         }
     }
 
-    fn generateTile(self: *Self,  tile_pos: Vi32) void {
-        self.getTilePtr(tile_pos).* = tileAtPosition(tile_pos);
-    }
-
-    fn tileAtPosition(tile_pos: Vi32) Tile {
+    pub fn tileAtPosition(tile_pos: Vi32) Tile {
         const shape = genShape(tile_pos);
         if (shape < 0) {
-            var tile = layers[tileLayerIndex(tile_pos)].pickTile(tile_pos, shape);
+            var tile = biomes[tileBiomeIndex(tile_pos)].pickTile(tile_pos, shape);
             tile.is_solid = 1;
             return tile;
         }
@@ -368,32 +408,32 @@ pub const Level = struct {
   
     }
 
-    fn genShape(tile_pos: Vi32) f32 {
-        const layer_index = layerIndex(tile_pos.y);
+    pub fn genShape(tile_pos: Vi32) f32 {
+        const biome_index = biomeIndex(tile_pos.y);
         if (transitionFactor(tile_pos.y)) |factor| {
             return m.lerp(
-                layers[layer_index].genShape(tile_pos),
-                layers[layer_index + 1].genShape(tile_pos),
+                biomes[biome_index].genShape(tile_pos),
+                biomes[biome_index + 1].genShape(tile_pos),
                 factor,
             );
         }
         else {
-            return layers[layer_index].genShape(tile_pos);
+            return biomes[biome_index].genShape(tile_pos);
         }
     }
 
     pub fn draw(self: Self, pos: Vi32) void {
         const y = self.view_pos.y + (view_size / 2);
-        const layer_index = layerIndex(y);
+        const biome_index = biomeIndex(y);
         if (transitionFactor(y)) |transition_factor| {
-            w4.PALETTE[0] = dr.lerpColor(layers[layer_index].bg_color, layers[layer_index + 1].bg_color, transition_factor);
-            w4.PALETTE[1] = dr.lerpColor(layers[layer_index].fg_color1, layers[layer_index + 1].fg_color1, transition_factor);
-            w4.PALETTE[2] = dr.lerpColor(layers[layer_index].fg_color2, layers[layer_index + 1].fg_color2, transition_factor);
+            w4.PALETTE[0] = dr.lerpColor(biomes[biome_index].bg_color, biomes[biome_index + 1].bg_color, transition_factor);
+            w4.PALETTE[1] = dr.lerpColor(biomes[biome_index].fg_color1, biomes[biome_index + 1].fg_color1, transition_factor);
+            w4.PALETTE[2] = dr.lerpColor(biomes[biome_index].fg_color2, biomes[biome_index + 1].fg_color2, transition_factor);
         }
         else {
-            w4.PALETTE[0] = layers[layer_index].bg_color;
-            w4.PALETTE[1] = layers[layer_index].fg_color1;
-            w4.PALETTE[2] = layers[layer_index].fg_color2;
+            w4.PALETTE[0] = biomes[biome_index].bg_color;
+            w4.PALETTE[1] = biomes[biome_index].fg_color1;
+            w4.PALETTE[2] = biomes[biome_index].fg_color2;
         }
         const start = self.view_pos;
         const end = start.addScalar(view_size);
@@ -407,7 +447,7 @@ pub const Level = struct {
                 if (tile.is_solid == 1) {
                     const n = m.noise(tile_pos);
                     const dpos = pos.add(tile_pos.mulScalar(tile_pixel_size));
-                    layers[tileLayerIndex(tile_pos)].drawTile(tile, dpos, n);
+                    biomes[tileBiomeIndex(tile_pos)].drawTile(tile, dpos, n);
                 }
             }
         }
@@ -417,13 +457,13 @@ pub const Level = struct {
         return (m.perlin(tile_pos.cast(f32), 8) + 1) / 2;
     }
 
-    fn layerIndex(y: i32) usize {
-        const i = @divFloor(y, layer_transition_height);
+    fn biomeIndex(y: i32) usize {
+        const i = @divFloor(y, biome_transition_height);
         if (i < 0) {
             return 0;
         }
-        else if (i >= layers.len) {
-            return layers.len - 1;
+        else if (i >= biomes.len) {
+            return biomes.len - 1;
         }
         else {
             return @intCast(usize, i);
@@ -431,28 +471,28 @@ pub const Level = struct {
     }
 
     fn transitionFactor(y: i32) ?f32 {
-        const layer_index = layerIndex(y);
-        if (layer_index >= (layers.len - 1)) {
+        const biome_index = biomeIndex(y);
+        if (biome_index >= (biomes.len - 1)) {
             return null;
         }
-        else if (layer_index == 0 and y < 0) {
+        else if (biome_index == 0 and y < 0) {
             return null;
         }
         else {
-            const y_layer = @intToFloat(f32, @mod(y, layer_transition_height));
-            const lheight = @intToFloat(f32, layer_height);
+            const y_biome = @intToFloat(f32, @mod(y, biome_transition_height));
+            const lheight = @intToFloat(f32, biome_height);
             const theight = @intToFloat(f32, transition_height);
-            if (y_layer < lheight) {
+            if (y_biome < lheight) {
                 return null;
             }
             else {
-                return (y_layer - lheight) / theight;
+                return (y_biome - lheight) / theight;
             }
         }
     }
 
-    fn tileLayerIndex(tile_pos: Vi32) u32 {
-        const index = layerIndex(tile_pos.y);
+    fn tileBiomeIndex(tile_pos: Vi32) u32 {
+        const index = biomeIndex(tile_pos.y);
         if (transitionFactor(tile_pos.y)) |transition_factor| {
             if (transition_factor < transitionShape(tile_pos)) {
                 return index;
@@ -464,23 +504,6 @@ pub const Level = struct {
         else {
             return index;
         }
-    }
-
-    fn transitionPhase(tile_pos: Vi32) TransitionPhase {
-        const layer_index = layerIndex(tile_pos);
-        if (layer_index >= (layers.len - 1)) {
-            return .full;
-        }
-        else {
-            const y = @mod(tile_pos.y, layer_transition_height);
-            if (y < layer_height) {
-                return .full;
-            }
-            else {
-                return @intToEnum(TransitionPhase, @mod(y - layer_height, phase_height));
-            }
-        }
-
     }
 
     pub fn checkRect(self: Self, pos: Vi32, size: Vu32, comptime filter: TileFilter) bool {
